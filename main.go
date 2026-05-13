@@ -31,6 +31,8 @@ func openBrowser(url string) {
 		cmd = "xdg-open"
 	}
 	args = append(args, url)
+	// #nosec G204 -- cmd is one of three hardcoded OS-specific binaries;
+	// exec.Command does not invoke a shell, so url cannot be interpreted as a command.
 	_ = exec.Command(cmd, args...).Start()
 }
 
