@@ -87,7 +87,7 @@
         endTime = Date.now() + remainingMs;
         stopTicker();
         tick();
-        intervalId = setInterval(tick, 250);
+        intervalId = setInterval(tick, 1000);
       }
 
       function stop() {
