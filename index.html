@@ -5,80 +5,148 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Countdown Timer</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 2rem; }
-    .timer { max-width: 360px; }
-    #display { font-size: 2.5rem; margin: 0.75rem 0; font-variant-numeric: tabular-nums; }
-    .controls, .set-time { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
-    input { width: 5rem; padding: 0.3rem; }
-    button { padding: 0.45rem 0.75rem; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #111;
+      color: #eee;
+      font-family: ui-monospace, "Courier New", monospace;
+    }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    #display {
+      font-size: clamp(5rem, 20vw, 14rem);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      color: #fff;
+    }
+
+    #display.done { color: #4ade80; }
+
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+    }
+
+    button {
+      font-family: inherit;
+      font-size: 0.8rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #222;
+      color: #ccc;
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    button:hover { background: #333; color: #fff; }
+    button:active { background: #1a1a1a; }
+
+    .set-time {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    .set-time label { color: #666; }
+
+    .set-time input {
+      width: 3.5rem;
+      padding: 0.3rem 0.4rem;
+      font-family: inherit;
+      font-size: 0.8rem;
+      text-align: center;
+      background: #1a1a1a;
+      border: 1px solid #444;
+      border-radius: 4px;
+      color: #ccc;
+      -moz-appearance: textfield;
+    }
+
+    .set-time input::-webkit-outer-spin-button,
+    .set-time input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .set-time span { color: #555; }
   </style>
 </head>
 <body>
-  <main class="timer">
-    <h1>Countdown Timer</h1>
+  <main>
     <div id="display" aria-live="polite">00:01:00</div>
 
     <div class="controls">
       <button id="start" type="button">Start</button>
-      <button id="stop" type="button">Stop</button>
+      <button id="stop"  type="button">Stop</button>
       <button id="reset" type="button">Reset</button>
     </div>
 
     <div class="set-time">
-      <label for="seconds">Seconds:</label>
-      <input id="seconds" type="number" min="0" step="1" value="60">
-      <button id="set" type="button">Set Time</button>
+      <label for="in-m">min</label>
+      <input id="in-m" type="number" min="0" max="99" value="1" inputmode="numeric">
+      <span>:</span>
+      <label for="in-s">sec</label>
+      <input id="in-s" type="number" min="0" max="59" value="0" inputmode="numeric">
+      <button id="set" type="button">Set</button>
     </div>
   </main>
 
   <script>
     (() => {
-      const display = document.getElementById('display');
-      const secondsInput = document.getElementById('seconds');
+      const display  = document.getElementById('display');
+      const inM      = document.getElementById('in-m');
+      const inS      = document.getElementById('in-s');
       const startBtn = document.getElementById('start');
-      const stopBtn = document.getElementById('stop');
+      const stopBtn  = document.getElementById('stop');
       const resetBtn = document.getElementById('reset');
-      const setBtn = document.getElementById('set');
+      const setBtn   = document.getElementById('set');
 
-      let durationSeconds = 60;
-      let remainingMs = durationSeconds * 1000;
+      let durationMs = 60_000;
+      let remainingMs = durationMs;
       let running = false;
       let endTime = 0;
       let intervalId = null;
 
-      function pad(n) {
-        return String(n).padStart(2, '0');
-      }
+      function pad(n) { return String(n).padStart(2, '0'); }
 
-      function format(totalSeconds) {
-        const s = Math.max(0, totalSeconds | 0);
+      function format(ms) {
+        const s = Math.max(0, Math.ceil(ms / 1000));
         const h = Math.floor(s / 3600);
         const m = Math.floor((s % 3600) / 60);
         const sec = s % 60;
         return `${pad(h)}:${pad(m)}:${pad(sec)}`;
       }
 
-      function render(ms) {
-        display.textContent = format(Math.ceil(ms / 1000));
+      function render() {
+        display.textContent = format(remainingMs);
+        display.classList.toggle('done', remainingMs <= 0 && !running && durationMs > 0);
       }
 
       function stopTicker() {
-        if (intervalId !== null) {
-          clearInterval(intervalId);
-          intervalId = null;
-        }
+        if (intervalId !== null) { clearInterval(intervalId); intervalId = null; }
       }
 
       function tick() {
         if (!running) return;
-        const msLeft = Math.max(0, endTime - Date.now());
-        remainingMs = msLeft;
-        render(remainingMs);
-
-        if (msLeft === 0) {
-          running = false;
-          stopTicker();
-        }
+        remainingMs = Math.max(0, endTime - Date.now());
+        render();
+        if (remainingMs <= 0) { running = false; stopTicker(); }
       }
 
       function start() {
@@ -95,24 +163,24 @@
         remainingMs = Math.max(0, endTime - Date.now());
         running = false;
         stopTicker();
-        render(remainingMs);
+        render();
       }
 
       function reset() {
         running = false;
         stopTicker();
-        remainingMs = durationSeconds * 1000;
-        render(remainingMs);
+        remainingMs = durationMs;
+        render();
       }
 
       function setTime() {
-        const parsed = Number.parseInt(secondsInput.value, 10);
-        const nextSeconds = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
-        durationSeconds = nextSeconds;
+        const m = Math.max(0, parseInt(inM.value || '0', 10));
+        const s = Math.max(0, Math.min(59, parseInt(inS.value || '0', 10)));
+        durationMs = (m * 60 + s) * 1000;
         running = false;
         stopTicker();
-        remainingMs = durationSeconds * 1000;
-        render(remainingMs);
+        remainingMs = durationMs;
+        render();
       }
 
       startBtn.addEventListener('click', start);
@@ -120,7 +188,7 @@
       resetBtn.addEventListener('click', reset);
       setBtn.addEventListener('click', setTime);
 
-      render(remainingMs);
+      render();
     })();
   </script>
 </body>
