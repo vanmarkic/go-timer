@@ -126,7 +126,7 @@ jobs:
           artifact-name: sbom.cdx.json
           output-file: sbom.cdx.json
       - name: Scan SBOM for vulnerabilities (grype)
-        uses: anchore/scan-action@v6
+        uses: anchore/scan-action@v7
         with:
           sbom: sbom.spdx.json
           severity-cutoff: high
