@@ -38,7 +38,7 @@ jobs:
         run: go test -race -covermode=atomic -coverprofile=coverage.out ./...
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage
           path: coverage.out
@@ -171,7 +171,7 @@ jobs:
           ls -lah out
           file "out/go-timer${{ matrix.ext }}" || true
       - name: Upload binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: go-timer-${{ matrix.goos }}-${{ matrix.goarch }}
           path: out/go-timer${{ matrix.ext }}
