@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Countdown Timer</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 2rem; }
+    .timer { max-width: 360px; }
+    #display { font-size: 2.5rem; margin: 0.75rem 0; font-variant-numeric: tabular-nums; }
+    .controls, .set-time { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.75rem 0; }
+    input { width: 5rem; padding: 0.3rem; }
+    button { padding: 0.45rem 0.75rem; }
+  </style>
+</head>
+<body>
+  <main class="timer">
+    <h1>Countdown Timer</h1>
+    <div id="display" aria-live="polite">00:01:00</div>
+
+    <div class="controls">
+      <button id="start" type="button">Start</button>
+      <button id="stop" type="button">Stop</button>
+      <button id="reset" type="button">Reset</button>
+    </div>
+
+    <div class="set-time">
+      <label for="seconds">Seconds:</label>
+      <input id="seconds" type="number" min="0" step="1" value="60">
+      <button id="set" type="button">Set Time</button>
+    </div>
+  </main>
+
+  <script>
+    (() => {
+      const display = document.getElementById('display');
+      const secondsInput = document.getElementById('seconds');
+      const startBtn = document.getElementById('start');
+      const stopBtn = document.getElementById('stop');
+      const resetBtn = document.getElementById('reset');
+      const setBtn = document.getElementById('set');
+
+      let durationSeconds = 60;
+      let remainingMs = durationSeconds * 1000;
+      let running = false;
+      let endTime = 0;
+      let intervalId = null;
+
+      function pad(n) {
+        return String(n).padStart(2, '0');
+      }
+
+      function format(totalSeconds) {
+        const s = Math.max(0, totalSeconds | 0);
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = s % 60;
+        return `${pad(h)}:${pad(m)}:${pad(sec)}`;
+      }
+
+      function render(ms) {
+        display.textContent = format(Math.ceil(ms / 1000));
+      }
+
+      function stopTicker() {
+        if (intervalId !== null) {
+          clearInterval(intervalId);
+          intervalId = null;
+        }
+      }
+
+      function tick() {
+        if (!running) return;
+        const msLeft = Math.max(0, endTime - Date.now());
+        remainingMs = msLeft;
+        render(remainingMs);
+
+        if (msLeft === 0) {
+          running = false;
+          stopTicker();
+        }
+      }
+
+      function start() {
+        if (running || remainingMs <= 0) return;
+        running = true;
+        endTime = Date.now() + remainingMs;
+        stopTicker();
+        tick();
+        intervalId = setInterval(tick, 250);
+      }
+
+      function stop() {
+        if (!running) return;
+        remainingMs = Math.max(0, endTime - Date.now());
+        running = false;
+        stopTicker();
+        render(remainingMs);
+      }
+
+      function reset() {
+        running = false;
+        stopTicker();
+        remainingMs = durationSeconds * 1000;
+        render(remainingMs);
+      }
+
+      function setTime() {
+        const parsed = Number.parseInt(secondsInput.value, 10);
+        const nextSeconds = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+        durationSeconds = nextSeconds;
+        running = false;
+        stopTicker();
+        remainingMs = durationSeconds * 1000;
+        render(remainingMs);
+      }
+
+      startBtn.addEventListener('click', start);
+      stopBtn.addEventListener('click', stop);
+      resetBtn.addEventListener('click', reset);
+      setBtn.addEventListener('click', setTime);
+
+      render(remainingMs);
+    })();
+  </script>
+</body>
+</html>
