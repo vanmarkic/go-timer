@@ -1,0 +1,22 @@
+# Binaries
+/go-timer
+/go-timer.exe
+/bin/
+/dist/
+
+# Test / coverage
+*.test
+*.out
+coverage.*
+
+# SBOM / scan artifacts
+*.sarif
+*.spdx.json
+*.cdx.json
+sbom.*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store

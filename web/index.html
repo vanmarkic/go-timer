@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>go-timer</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <main class="app">
+        <h1>Countdown Timer</h1>
+        <div id="display" class="display" aria-live="polite">00:01:00</div>
+        <div id="status" class="status">Ready</div>
+
+        <div class="controls">
+            <button id="btn-start" type="button">Start</button>
+            <button id="btn-stop" type="button">Stop</button>
+            <button id="btn-reset" type="button">Reset</button>
+        </div>
+
+        <form id="set-form" class="set-form" autocomplete="off">
+            <label>
+                H
+                <input id="in-h" type="number" min="0" max="23" value="0" inputmode="numeric">
+            </label>
+            <label>
+                M
+                <input id="in-m" type="number" min="0" max="59" value="1" inputmode="numeric">
+            </label>
+            <label>
+                S
+                <input id="in-s" type="number" min="0" max="59" value="0" inputmode="numeric">
+            </label>
+            <button id="btn-set" type="submit">Set Time</button>
+        </form>
+    </main>
+
+    <script src="/app.js"></script>
+</body>
+</html>
