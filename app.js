@@ -4,13 +4,10 @@
     const btnStart = document.getElementById('btn-start');
     const btnStop = document.getElementById('btn-stop');
     const btnReset = document.getElementById('btn-reset');
-    const form = document.getElementById('set-form');
-    const inH = document.getElementById('in-h');
-    const inM = document.getElementById('in-m');
-    const inS = document.getElementById('in-s');
+    const presetBtns = document.querySelectorAll('.preset-btn');
 
     // State: duration is what we reset to; remainingMs is what's on the clock.
-    let durationMs = 60_000;
+    let durationMs = 300_000; // default S0: 5:00
     let remainingMs = durationMs;
     let running = false;
     let lastTick = 0;
@@ -18,11 +15,10 @@
 
     function format(ms) {
         const totalSec = Math.max(0, Math.ceil(ms / 1000));
-        const h = Math.floor(totalSec / 3600);
-        const m = Math.floor((totalSec % 3600) / 60);
+        const m = Math.floor(totalSec / 60);
         const s = totalSec % 60;
         const pad = (n) => String(n).padStart(2, '0');
-        return `${pad(h)}:${pad(m)}:${pad(s)}`;
+        return `${pad(m)}:${pad(s)}`;
     }
 
     function render() {
@@ -31,7 +27,7 @@
         display.classList.toggle('finished', finished);
         if (finished) {
             status.textContent = 'Finished';
-            document.title = '00:00:00 - Finished';
+            document.title = '00:00 - Finished';
         } else if (running) {
             status.textContent = 'Running';
             document.title = `${format(remainingMs)} - Running`;
@@ -112,17 +108,17 @@
     btnStop.addEventListener('click', stop);
     btnReset.addEventListener('click', reset);
 
-    form.addEventListener('submit', (ev) => {
-        ev.preventDefault();
-        const h = Math.max(0, parseInt(inH.value || '0', 10));
-        const m = Math.max(0, parseInt(inM.value || '0', 10));
-        const s = Math.max(0, parseInt(inS.value || '0', 10));
-        setDuration(h * 3600 + m * 60 + s);
+    presetBtns.forEach((btn) => {
+        btn.addEventListener('click', () => {
+            presetBtns.forEach((b) => b.classList.remove('active'));
+            btn.classList.add('active');
+            setDuration(parseInt(btn.dataset.seconds, 10));
+        });
     });
 
     // Keyboard shortcuts: space = start/stop, r = reset.
     document.addEventListener('keydown', (ev) => {
-        if (ev.target.tagName === 'INPUT') return;
+        if (ev.target.tagName === 'BUTTON') return;
         if (ev.code === 'Space') { ev.preventDefault(); running ? stop() : start(); }
         else if (ev.key === 'r' || ev.key === 'R') { reset(); }
     });

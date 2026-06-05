@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>go-timer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <main class="app">
+        <h1>Countdown Timer</h1>
+        <div id="display" class="display" aria-live="polite">05:00</div>
+        <div id="status" class="status">Ready</div>
+
+        <div class="controls">
+            <button id="btn-start" type="button">Start</button>
+            <button id="btn-stop" type="button">Stop</button>
+            <button id="btn-reset" type="button">Reset</button>
+        </div>
+
+        <div class="presets" role="group" aria-label="Preset durations">
+            <button class="preset-btn active" type="button" data-seconds="300">S0 — 5:00</button>
+            <button class="preset-btn" type="button" data-seconds="290">S1 — 4:50</button>
+            <button class="preset-btn" type="button" data-seconds="280">S2 — 4:40</button>
+            <button class="preset-btn" type="button" data-seconds="270">S3 — 4:30</button>
+            <button class="preset-btn" type="button" data-seconds="260">S4 — 4:20</button>
+            <button class="preset-btn" type="button" data-seconds="250">S5 — 4:10</button>
+            <button class="preset-btn" type="button" data-seconds="240">S6 — 4:00</button>
+            <button class="preset-btn" type="button" data-seconds="230">S7 — 3:50</button>
+            <button class="preset-btn" type="button" data-seconds="210">S8 — 3:30</button>
+            <button class="preset-btn" type="button" data-seconds="190">S9 — 3:10</button>
+            <button class="preset-btn" type="button" data-seconds="180">S10 — 3:00</button>
+        </div>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
