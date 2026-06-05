@@ -118,6 +118,7 @@
 
     // Keyboard shortcuts: space = start/stop, r = reset.
     document.addEventListener('keydown', (ev) => {
+        if (ev.target.tagName === 'BUTTON') return;
         if (ev.code === 'Space') { ev.preventDefault(); running ? stop() : start(); }
         else if (ev.key === 'r' || ev.key === 'R') { reset(); }
     });
