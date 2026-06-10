@@ -1,7 +1,7 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
+<!-- saved from url=(0037)https://vanmarkic.github.io/go-timer/ -->
+<html lang="en"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Countdown Timer</title>
   <style>
@@ -83,7 +83,7 @@
 
     <div class="controls">
       <button id="start" type="button">Start</button>
-      <button id="stop"  type="button">Stop</button>
+      <button id="stop" type="button">Pause</button>
       <button id="reset" type="button">Reset</button>
     </div>
 
@@ -93,24 +93,26 @@
   <script>
     (() => {
       const PRESETS = [
-        { label: 'S0',  ms: 5*60*1000 },
-        { label: 'S1',  ms: (4*60+50)*1000 },
-        { label: 'S2',  ms: (4*60+40)*1000 },
-        { label: 'S3',  ms: (4*60+30)*1000 },
-        { label: 'S4',  ms: (4*60+20)*1000 },
-        { label: 'S5',  ms: (4*60+10)*1000 },
-        { label: 'S6',  ms: 4*60*1000 },
-        { label: 'S7',  ms: (3*60+50)*1000 },
-        { label: 'S8',  ms: (3*60+30)*1000 },
-        { label: 'S9',  ms: (3*60+10)*1000 },
-        { label: 'S10', ms: 3*60*1000 },
+        { label: 'S0 (5:00)',  ms: 5*60*1000 },
+        { label: 'S1 (4:50)',  ms: (4*60+50)*1000 },
+        { label: 'S2 (4:40)',  ms: (4*60+40)*1000 },
+        { label: 'S3 (4:30)',  ms: (4*60+30)*1000 },
+        { label: 'S4 (4:20)',  ms: (4*60+20)*1000 },
+        { label: 'S5 (4:10)',  ms: (4*60+10)*1000 },
+        { label: 'S6 (4:00)',  ms: 4*60*1000 },
+        { label: 'S7 (3:50)',  ms: (3*60+50)*1000 },
+        { label: 'S8 (3:30)',  ms: (3*60+30)*1000 },
+        { label: 'S9 (3:10)',  ms: (3*60+10)*1000 },
+        { label: 'S10 (3:00)', ms: 3*60*1000 },
       ];
 
       const display    = document.getElementById('display');
       const startBtn   = document.getElementById('start');
-      const stopBtn    = document.getElementById('stop');
+      const stopBtn    = document.getElementById('pause');
       const resetBtn   = document.getElementById('reset');
       const presetsDiv = document.getElementById('presets');
+      presetsDiv.innerHTML = '';
+
 
       let durationMs  = PRESETS[0].ms;
       let remainingMs = durationMs;
@@ -199,5 +201,6 @@
       render();
     })();
   </script>
-</body>
-</html>
+
+
+</body></html>
