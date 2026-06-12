@@ -1,0 +1,522 @@
+# Mission
+
+Evolve the **existing prototype** into a modular Security Operations Center (SOC)
+platform using a strict ports-and-adapters (hexagonal) architecture. The codebase already
+has a working feature-sliced backend (FastAPI + SQLAlchemy + Keycloak), a feature-gated
+Angular 21 frontend, and a Docker Compose stack. Build on top of what exists — do not
+rewrite from scratch.
+
+A customer may deploy ONLY the core, or enable any subset of optional modules. The core
+must run fully with every optional module disabled.
+
+You are an autonomous coding agent. Work in small, verifiable increments. After each
+increment, run the relevant check (tests, `docker compose config`, build) and report
+the result before moving on. Do NOT batch many milestones into one large unverified
+change. Never leave stubs where the milestone asks for working code.
+
+---
+
+# What already exists (DO NOT recreate — extend or refactor)
+
+## Backend (`backend/src/`)
+
+| Component | File(s) | What it does | Status |
+|---|---|---|---|
+| **Feature base class** | `features/base.py` | `Feature` ABC with `FeatureConfig`, `router`, `get_models()`, `is_enabled()`, `setup()` | Keep — extend with port registration |
+| **Feature registry** | `features/registry.py` | Auto-discovers `Feature` subclasses from `src/features/`, topological sort, route + table creation | Keep — extend with port/adapter wiring |
+| **Config loader** | `core/config.py` | `Settings(BaseSettings)` with `features.yaml` + `ENABLED_FEATURES`/`DISABLED_FEATURES` env overrides, customer-based config | Keep — add module-specific settings |
+| **Auth (Keycloak JWT)** | `core/auth.py` | `JwksCache`, bearer token validation, `AuthenticatedUser` dataclass, `require_authenticated_user()` | Keep as-is |
+| **Permissions** | `core/permissions.py` | `PermissionAtom` Literal, `Persona` Literal, `require_permission()`, `require_any_permission()`, `require_all_permissions()`, `user_personas()`, `is_strictly_read_only()` | Keep — add new permission atoms for new modules |
+| **Read-only enforcement** | `core/read_only.py` | Global middleware blocks mutations for read-only personas | Keep as-is |
+| **Feature guard middleware** | `main.py` | Blocks HTTP requests to disabled-feature route prefixes, returns 403 | Keep — enhance to return the standard disabled response shape |
+| **Feature flag deps** | `core/dependencies.py` | `require_feature(name)` FastAPI dependency | Keep as-is |
+| **Fleet router** | `core/ships_router.py` | Fleet asset CRUD + location endpoints, optional separate DB | Refactor into `fleet` module |
+| **Fleet database** | `core/ships_database.py` | Optional separate Postgres connection for fleet assets | Move into `fleet` module |
+| **Feature A (Items)** | `features/feature_a/` | Item CRUD, schema `feature_a` | Absorb into `fleet` or remove |
+| **Feature B (Cases)** | `features/feature_b/` | Case + Incident lifecycle, observables, comments, tasks — 73KB | Split into `incidents` (core) + `cases` (optional) |
+| **Feature C (Reports)** | `features/feature_c/` | Placeholder | Evolve into reporting or remove |
+| **Database** | `core/database.py` | SQLAlchemy engine, `SessionLocal`, `Base`, `FeatureState` model | Keep — add outbox table |
+
+## Frontend (`frontend/src/app/`)
+
+| Component | File(s) | What it does | Status |
+|---|---|---|---|
+| **App shell** | `app.component.ts` | Navigation with `AppNavLink`/`AppNavGroup`, feature + permission gating, Keycloak auth lifecycle | Keep — refactor nav items to match new module ids |
+| **FeatureService** | `core/services/feature.service.ts` | Reads build-time `runtimeConfig.features` flags | Refactor to call `/api/me/modules` at runtime |
+| **Auth** | `core/auth/` | `access.ts`, `permissions.ts`, `persona-landing.ts` | Keep as-is |
+| **Route guard** | `guards/auth-role.guard.ts` | `canActivateAuthRole` with permission metadata | Keep as-is |
+| **Route generator** | `scripts/generate-routes.js` | Generates `app.routes.ts` from feature dirs | Replace with backend-driven route config |
+| **Feature A** | `features/feature-a/` | Fleet asset list, map view (MapLibre GL) | Rename to `fleet/` |
+| **Feature B** | `features/feature-b/` | Cases, incidents, observables UI | Split into `incidents/` + `cases/` |
+| **Feature C** | `features/feature-c/` | Placeholder | Evolve or remove |
+| **Feature D** | `features/feature-d/` | Placeholder admin CRUD | Merge into `admin/` |
+| **Services** | `services/case.service.ts`, `fleet.service.ts` | Direct HTTP to backend | Move into respective feature dirs |
+| **Models** | `models/case.model.ts`, `fleet.model.ts` | TS interfaces | Replace with OpenAPI-generated client |
+| **Environment** | `environments/environment.ts` | Build-time feature flags, Keycloak config, API URL | Keep Keycloak/API config, remove hardcoded feature flags |
+| **Runtime config** | `core/config/runtime-config.ts` | `AppRuntimeConfig` with `features: FeatureFlags` | Simplify — features come from `/api/me/modules` |
+
+## Infrastructure
+
+| Component | File(s) | Status |
+|---|---|---|
+| **Docker Compose** | `docker-compose.yml` | Services: db (postgres:15), keycloak, backend, frontend — no profiles | Add profiles per spec |
+| **Compose overrides** | `docker-compose.override.yml`, `docker-compose.local.yml` | Local dev tweaks | Keep |
+| **Backend Dockerfile** | `backend/Dockerfile`, `backend/Dockerfile.local` | Multi-stage build with `CUSTOMER_ID`/`ENABLED_FEATURES` args | Keep — adapt for profiles |
+| **Frontend Dockerfile** | `frontend/Dockerfile` | Angular build + nginx serve | Keep |
+| **Nginx** | `frontend/nginx.conf` | SPA fallback, app prefix strip | Add API proxy rules if needed |
+| **Migrations** | `backend/migrations/sql/*.sql` | Manual SQL files | Migrate to Alembic |
+| **E2E tests** | `e2e/` (root level) | Playwright tests for IAM, SOC analyst, CSA kiosk, backup | Keep — extend |
+| **CI/CD** | `.gitlab-ci.yml` | GitLab CI with Kaniko, SonarQube | Keep |
+| **K8s** | `k8s/`, `clusters/` | Kubernetes manifests | Keep — not in scope |
+| **Keycloak config** | `backend/keycloack/` | Realm JSON + custom theme | Keep as-is (note: dir is misspelled `keycloack`) |
+
+## Python dependencies (`backend/requirements.txt`)
+
+Already present: `fastapi`, `uvicorn`, `sqlalchemy==2.0.23`, `pydantic>=2.5`, `pydantic-settings`,
+`alembic==1.12.1`, `psycopg2-binary`, `pyyaml`, `python-jose`, `passlib`.
+
+Missing (add): `celery`, `redis`, `structlog`, `ruff`, `mypy`, `pytest`, `pytest-asyncio`,
+`respx`, `httpx` (for async test client).
+
+## Frontend dependencies (`frontend/package.json`)
+
+Already present: Angular 21, `keycloak-angular`, `keycloak-js`, `maplibre-gl`, `rxjs`.
+
+Missing (add): `@angular/material`, OpenAPI codegen tooling (e.g. `@openapitools/openapi-generator-cli`),
+Playwright (currently root-level `e2e/`, may need frontend-local config).
+
+---
+
+# Naming migration plan
+
+Rename the existing generic feature names to SOC domain names. This is a refactoring
+prerequisite for M0.
+
+| Current id | New id | Type | Notes |
+|---|---|---|---|
+| `feature_a` | `fleet` | optional | Fleet assets + map. Absorb fleet router from core |
+| `feature_b` (incident part) | `incidents` | **core** | Extract incident lifecycle from feature_b |
+| `feature_b` (case part) | `cases` | optional | Extract case management from feature_b |
+| `feature_cases` | `cases` | optional | Merge with above |
+| `feature_c` | *(remove or repurpose)* | — | Placeholder, no real code |
+| `feature_d` | *(remove)* | — | Placeholder |
+| `core` | `core` | core | Keep |
+| *(new)* | `alerts` | core | New module |
+| *(new)* | `rules` | core | New module |
+| *(new)* | `admin` | core | RBAC, tenant settings, modules management |
+| *(new)* | `audit` | core | Audit log + adapter tracking |
+| *(new)* | `module_registry` | core | Runtime module availability |
+| *(new)* | `awareness` | optional | Situational awareness overlays |
+| *(new)* | `threat_intel` | optional | MISP enrichment |
+| *(new)* | `event_search` | optional | OpenSearch event search |
+| *(new)* | `workflow` | optional | n8n playbook execution |
+| *(new)* | `ai` | optional | AI enrichment behind human-review gate |
+
+Update `features.yaml`, `ENABLED_FEATURES` env vars, `PermissionAtom`, frontend
+`environment.ts` features, and `FeatureService` to use new ids. Update all references
+in existing code.
+
+---
+
+# Locked stack — do not substitute
+
+- Backend: Python 3.12, FastAPI (already in use), Pydantic v2 (already in use),
+  SQLAlchemy 2.x (already in use), Alembic (dep present, not yet wired), PostgreSQL
+  (already postgres:15), Celery + Redis (add), structlog (add, replace stdlib logging).
+- Frontend: Angular 21 (already in use, standalone components), Angular Material (add),
+  RxJS (already in use), OpenAPI-generated TypeScript client (add, replace hand-written
+  models/services), Playwright for E2E (exists at `e2e/`).
+- Auth: Keycloak (already in use — keep existing `core/auth.py` and realm config).
+- Reverse proxy: nginx (exists in `frontend/nginx.conf` — extend if needed).
+- Quality tools: ruff (add), mypy (add), pytest + pytest-asyncio (add), respx (add).
+- Deployment: Docker Compose with profiles (refactor existing `compose.yml`).
+
+---
+
+# One vocabulary everywhere (Compose, backend, frontend, tests)
+
+- Backend module ids (snake_case): `alerts`, `incidents`, `rules`, `admin`, `audit`,
+  `module_registry`, `fleet`, `awareness`, `cases`, `threat_intel`, `event_search`,
+  `workflow`, `ai`.
+- Provider ids: `internal_case`, `iris`, `misp`, `opensearch`, `n8n`, `ai_local`,
+  `openai_compatible`, `maps_osm`, `fleet_http`, `null`.
+- Compose profiles: `core`, `fleet`, `awareness`, `case-internal`, `case-iris`,
+  `misp`, `event-search`, `workflow`, `ai`, `observability`, `test`.
+- Frontend uses Angular route naming (kebab-case folders, e.g. `threat-intel/`) but the
+  backend Python package is `threat_intel`. The threat-intel UI route is `/ti`.
+- There is NO generic `case` profile — only `case-internal` and `case-iris`.
+
+---
+
+# Non-negotiable architectural invariants
+
+1. Slice by business capability, never by third-party product.
+2. The core (alerts, incidents, rules, admin/RBAC, audit, module_registry, outbox/event
+   bus) must run without any optional module, provider, or external service.
+3. Optional modules are independently enableable/disableable via config + Compose profile.
+4. Disabled modules FAIL CLOSED via null/no-op adapters and hidden frontend routes — never
+   via runtime errors. The existing feature-guard middleware in `main.py` already blocks
+   disabled routes with 403 — enhance it to return the standard disabled-response shape
+   instead of a generic 403.
+5. Angular must NEVER call MISP, IRIS, n8n, AI, OpenSearch, or fleet providers directly.
+6. Backend domain code must NEVER import vendor clients or external API schemas.
+7. Vendor-specific payloads live ONLY in adapters, fixtures, and adapter audit records.
+8. All external systems are reached through internal ports (interfaces).
+9. Every adapter has contract tests (real + null variants).
+10. Every state-changing action is audit logged.
+11. Every external adapter call records: adapter name, adapter version, port, operation,
+    status, latency_ms, request/response payload hash, external correlation id (if any),
+    error_type. No secrets in audit records.
+12. Frontend navigation/routes are generated from backend module enablement + RBAC
+    permissions — not from build-time feature flags. The existing `FeatureService` in
+    `core/services/feature.service.ts` must be refactored to call `/api/me/modules`
+    instead of reading `runtimeConfig.features`. The hardcoded `navigationItems` array
+    in `app.component.ts` must be replaced with backend-driven config.
+
+---
+
+# Required internal ports (define BEFORE any vendor client)
+
+These are Python ABCs in `backend/src/ports/`. The existing codebase has no port layer —
+create it.
+
+`LogCollectorRulePort`, `FleetLocationProviderPort`, `MapProviderPort`,
+`CaseManagementPort`, `ThreatIntelPort`, `EventSearchPort`, `WorkflowPort`,
+`AIEnrichmentPort`, and `IdentityProviderPort` if needed (Keycloak auth is already
+handled by `core/auth.py` — only add this port if there's a second identity source).
+
+Provide a Null adapter for every optional port (e.g. `NullThreatIntelAdapter`,
+`NullCaseManagementAdapter`, `NullWorkflowAdapter`, `NullAIAdapter`,
+`NullFleetProviderAdapter`, `NullMapProviderAdapter`, `NullEventSearchAdapter`).
+Null adapters return controlled responses and never raise on the normal disabled path:
+
+```json
+{ "enabled": false, "reason": "module_not_enabled" }
+```
+
+---
+
+# Module registry contract
+
+The existing `core/router.py` exposes `/api/v1/core/features` as a simple list. Replace
+this with `/api/me/modules` and `/api/admin/modules` that expose canonical module ids
+and enough metadata to drive routing and disabled-state handling. Minimum record shape:
+
+```json
+{
+  "id": "threat_intel",
+  "enabled": false,
+  "status": "disabled",
+  "reason": "module_not_enabled",
+  "routes": ["/ti"],
+  "required_permissions": ["threat_intel:read"],
+  "dependencies": ["misp"],
+  "provider": { "id": "null", "configured": false }
+}
+```
+
+`status` is one of: `enabled`, `disabled`, `not_configured`, `degraded`.
+
+The existing `FeatureRegistry` in `features/registry.py` and `FeatureState` in
+`core/database.py` should be extended (not replaced) to produce this shape.
+
+---
+
+# Adapter audit contract
+
+The existing codebase has no audit infrastructure. Create `backend/src/features/audit/`.
+
+Every external adapter call creates a record with at least:
+
+```json
+{
+  "adapter_name": "misp",
+  "adapter_version": "v1",
+  "port_name": "ThreatIntelPort",
+  "operation": "lookup_indicator",
+  "status": "success",
+  "started_at": "2026-01-01T00:00:00Z",
+  "completed_at": "2026-01-01T00:00:00Z",
+  "latency_ms": 42,
+  "request_payload_hash": "sha256:...",
+  "response_payload_hash": "sha256:...",
+  "external_correlation_id": null,
+  "error_type": null
+}
+```
+
+`status` is one of: `success`, `failure`, `timeout`, `skipped`, `not_configured`.
+
+---
+
+# Core backend modules
+
+- `alerts`: ingestion, list/detail/status, correlation to incidents. *(new)*
+- `incidents`: lifecycle, timeline, severity, linked alerts. *(extract from feature_b)*
+- `rules`: rules triggered by a log collector — validation, simulation, activation. *(new)*
+- `admin`: RBAC, CRUD, tenant settings, enabled-modules management. *(new — absorb
+  platform-admin and backup functionality from existing routes)*
+- `audit`: audit log + adapter run tracking. *(new)*
+- `module_registry`: runtime module availability and tenant capability settings. *(new —
+  evolve from existing `FeatureRegistry`)*
+
+---
+
+# Optional backend modules
+
+- `fleet`: assets, positions, tracks, geofences (`FleetLocationProviderPort`,
+  `MapProviderPort`). *(refactor from feature_a + fleet router + fleet database)*
+- `awareness`: situational-awareness overlays + map aggregation. *(new)*
+- `cases`: case promotion, evidence, tasks — `internal_case` provider OR `iris` provider.
+  *(extract from feature_b)*
+- `threat_intel`: MISP enrichment + indicator context (`ThreatIntelPort`). *(new)*
+- `event_search`: OpenSearch-backed event search (`EventSearchPort`). *(new)*
+- `workflow`: n8n playbook execution + callbacks (`WorkflowPort`). *(new)*
+- `ai`: structured AI summary/classification/recommendation behind a human-review gate,
+  output validated against a schema (`AIEnrichmentPort`). *(new)*
+
+---
+
+# Existing permissions to keep and extend
+
+The existing `PermissionAtom` in `core/permissions.py` already defines atoms for:
+`config.*`, `backup.*`, `module.*`, `dashboard.*`, `incident.*`, `case.*`, `rule.*`,
+`hunt.*`, `report.*`, `audit.*`, `display.*`, `action.*`, `service-account.*`, `fleet.*`.
+
+Add new atoms for new modules:
+- `alert.view`, `alert.triage`, `alert.assign`
+- `fleet.view`, `fleet.manage`, `fleet.geofence`
+- `awareness.view`
+- `threat_intel.read`, `threat_intel.submit`
+- `event_search.query`
+- `workflow.view`, `workflow.execute`, `workflow.manage`
+- `ai.view`, `ai.review`, `ai.approve`
+
+Keep existing `Persona` definitions and `READ_ONLY_PERSONAS`.
+
+---
+
+# Frontend target structure
+
+Refactor from the existing `features/feature-{a,b,c,d}` layout to:
+
+```text
+frontend/src/app/
+  core/                          ← keep existing (auth, guards, interceptors, config)
+    services/feature.service.ts  ← refactor to call /api/me/modules
+  shell/                         ← extract from app.component.ts (layout, nav)
+  shared/                        ← new (tables, maps, timeline, status-chips)
+  generated-api/                 ← new (OpenAPI codegen output)
+  features/
+    alerts/                      ← new
+    incidents/                   ← extract from feature-b
+    rules/                       ← new
+    admin/                       ← new (absorb feature-d admin CRUD)
+    fleet/                       ← rename from feature-a
+    awareness/                   ← new
+    cases/                       ← extract from feature-b
+    threat-intel/                ← new
+    workflows/                   ← new
+    ai-review/                   ← new
+    event-search/                ← new
+```
+
+The frontend calls `/api/me/modules` and `/api/me/permissions` BEFORE building
+navigation (replaces the current build-time `runtimeConfig.features` approach).
+Disabled modules never appear in the menu. Core routes include
+`/alerts`, `/alerts/:id`, `/incidents`, `/incidents/:id`, `/rules`, `/rules/new`,
+`/rules/:id`, `/rules/simulator`, `/admin/users`, `/admin/roles`, `/admin/modules`.
+Optional routes are gated and include `/fleet/map`, `/awareness`, `/cases`, `/ti`,
+`/workflows`, `/ai-review/:id`, plus event-search.
+
+The existing `scripts/generate-routes.js` that auto-generates `app.routes.ts` should
+be replaced with a runtime approach driven by `/api/me/modules`.
+
+---
+
+# Docker Compose rules
+
+Refactor the existing `docker-compose.yml` (which currently has no profiles and runs
+db + keycloak + backend + frontend as a flat stack) to use Compose profiles.
+
+These commands MUST stay valid:
+
+```bash
+docker compose --profile core up -d
+docker compose --profile core --profile fleet --profile awareness up -d
+docker compose --profile core --profile case-internal up -d
+docker compose --profile core --profile case-iris up -d
+docker compose --profile core --profile misp up -d
+docker compose --profile core --profile event-search up -d
+docker compose --profile core --profile workflow up -d
+docker compose --profile core --profile ai up -d
+docker compose --profile core --profile fleet --profile awareness --profile case-iris \
+  --profile misp --profile event-search --profile workflow --profile ai \
+  --profile observability up -d
+```
+
+The existing services (db, keycloak, backend, frontend) go into the `core` profile.
+Add Redis to `core` (needed for Celery). Add optional services (MISP, IRIS,
+OpenSearch, n8n, etc.) under their respective profiles.
+
+Keep `docker-compose.override.yml` and `docker-compose.local.yml` for local dev
+tweaks.
+
+Add Makefile shortcuts: `core-up`, `fleet-awareness-up`, `full-up`, `migrate`, `seed`,
+`modularity-tests`, `acceptance`, `full-start`, `stop`, `reset`.
+
+---
+
+# Build order (work top to bottom; verify each milestone before the next)
+
+## M0 — Foundation (extend, don't recreate)
+
+- Rename features: `feature_a` → `fleet`, split `feature_b` → `incidents` + `cases`,
+  remove `feature_c`/`feature_d` placeholders. Update `features.yaml`, env vars,
+  `FeatureService`, `app.component.ts` nav items, route generator, all imports.
+- Add profiles to `compose.yml` (core profile covers db, keycloak, redis, backend,
+  frontend). Add Redis service.
+- Add `.env.example` (the existing `backend/.env` has values but no example file).
+- Add Makefile with shortcuts.
+- Add `pyproject.toml` with ruff/mypy/pytest config (existing project uses
+  `requirements.txt` — keep it, add pyproject for tool config).
+- Wire Alembic properly (the dep is in requirements.txt but there's no `alembic.ini`
+  or `alembic/` directory — create them, convert the manual `migrations/sql/` files).
+- Replace stdlib `logging` with `structlog` throughout backend.
+- **Verify:** `docker compose --profile core config` valid; backend & frontend images
+  build; existing E2E tests in `e2e/` still pass with renamed features.
+
+## M1 — Platform core (new infrastructure on existing foundation)
+
+- Create `backend/src/ports/` with all port ABCs.
+- Create all Null adapters in `backend/src/adapters/null/`.
+- Extend `FeatureRegistry` (in `features/registry.py`) to wire ports → adapters based
+  on config, and to produce the `/api/me/modules` response shape.
+- Add `module_registry` feature (extends existing `FeatureState` + registry).
+- Add event bus + outbox table (use existing `core/database.py` Base).
+- Add audit infrastructure (`features/audit/`).
+- Add `/health` improvements (existing health endpoint stays, add port health checks).
+- **Verify:** unit tests for registry + null adapters pass; `/api/me/modules` returns
+  correct shape.
+
+## M2 — Core APIs (new + extracted)
+
+- `alerts`: new module — ingestion, list/detail/status, correlation to incidents.
+- `incidents`: extract from `feature_b` — lifecycle, timeline, severity, linked alerts.
+  The existing `Incident` model in `feature_b/models.py` is the starting point.
+- `rules`: new module — log collector rules, deterministic simulator, validation.
+- `admin`: new module — RBAC management, tenant settings, enabled-modules CRUD.
+  Absorb any admin functionality from existing routes.
+- `audit`: wire endpoints for audit log + adapter run queries.
+- Create proper Alembic migrations for all new and extracted models.
+- Add new `PermissionAtom` entries to `core/permissions.py`.
+- **Verify:** unit + contract tests pass; `alembic upgrade head` runs clean.
+
+## M3 — Angular shell + core UI (refactor existing frontend)
+
+- Extract shell from `app.component.ts` into `shell/` (layout, navigation components).
+- Refactor `FeatureService` to call `/api/me/modules` (replace build-time flags).
+- Set up OpenAPI codegen → `generated-api/` (replace hand-written `services/` and
+  `models/`).
+- Add Angular Material.
+- Create/refactor core feature views: alerts, incidents (from feature-b), rules, admin.
+- **Verify:** `ng build` succeeds; menu hides disabled modules; existing Playwright
+  tests in `e2e/` pass.
+
+## M4 — Optional-module shells (disabled-mode behaviour)
+
+- For every optional module: controlled responses from Null adapters, hidden routes.
+- Wire `cases` (extracted from feature_b), `fleet` (from feature_a + fleet router).
+- Create shells for awareness, threat_intel, event_search, workflow, ai.
+- **Verify:** modularity tests pass with all optional modules OFF; core-only compose
+  starts cleanly.
+
+## M5+ — Providers, one at a time, each behind its port + contract tests
+
+- fleet & awareness (FleetLocationProviderPort, MapProviderPort — existing MapLibre
+  integration in feature-a is the starting point)
+- cases (internal_case provider, then IRIS provider behind CaseManagementPort)
+- MISP threat_intel (ThreatIntelPort)
+- OpenSearch event_search (EventSearchPort)
+- n8n workflow (WorkflowPort)
+- AI (AIEnrichmentPort)
+- Then full-profile Compose + acceptance tests.
+
+---
+
+# Test layout & required behaviours
+
+Existing tests live at `e2e/` (root-level Playwright). Backend has no test suite yet.
+
+Create:
+```text
+backend/tests/
+  unit/
+  contract/
+  modularity/
+  acceptance/
+  conftest.py
+```
+
+Keep `e2e/` at root level (it already has Playwright config + persona-based tests).
+
+Required test behaviours:
+1. Core profile works with all optional modules disabled.
+2. `/api/me/modules` reflects enabled modules from config.
+3. Disabled optional endpoints return controlled disabled responses (not 500s, not
+   generic 403s as the current middleware does).
+4. Angular menu hides disabled modules.
+5. Rule simulator returns deterministic match/no-match for a sample log event.
+6. A collector payload creates an alert.
+7. Alert promotes to a case ONLY when the case module is enabled.
+8. MISP enrichment runs ONLY when threat_intel is enabled.
+9. AI recommendation runs ONLY when AI is enabled and output validates against schema.
+10. Adapter contract tests cover both real and null adapters.
+
+---
+
+# Definition of done (per change)
+
+1. Implemented, not stubbed. 2. Tests exist and pass for the affected area.
+3. `docker compose --profile core config` still valid if Compose changed.
+4. Disabled-module behaviour tested if an optional module was touched.
+5. Existing E2E tests in `e2e/` still pass (or are updated for renames).
+6. Docs updated if a new command/dependency was added.
+
+---
+
+# Do NOT
+
+- Recreate infrastructure that already works (Keycloak auth, permission system, feature
+  registry pattern, Docker Compose services). Extend them.
+- Delete the existing `e2e/` Playwright tests — update them for renames.
+- Delete or rename the `backend/keycloack/` directory (it's misspelled but referenced
+  everywhere including Docker volumes and CI).
+- Make MISP, IRIS, AI, n8n, OpenSearch, fleet, or awareness mandatory for the core.
+- Put business rules inside n8n workflows.
+- Expose third-party secrets to Angular.
+- Let vendor DTOs leak into domain models.
+- Add a route without checking module enablement + RBAC (the existing `require_feature()`
+  dependency and `require_permission()` patterns should be used consistently).
+- Swallow errors — convert them into typed domain/adapter errors.
+- Break the existing GitLab CI pipeline (`.gitlab-ci.yml`).
+- Touch K8s manifests (`k8s/`, `clusters/`) — they're out of scope.
+
+---
+
+# Final acceptance flow (full demo)
+
+Collector payload → rule fires → alert created → alert shows in Angular → linked to/creates
+incident → (if enabled) fleet + awareness context, MISP enrichment, promotion to case, n8n
+playbook, AI structured recommendation → every action in the audit trail → and the same
+core still works with all optional modules disabled.
+
+---
+
+# Scope recommendation
+
+For a first pass, stop after M4 (working core + disabled-mode optional shells). That alone
+proves the modularity thesis. M5+ providers can come in follow-up sessions.
+
+Drive it milestone-by-milestone — approve M0 output before starting M1. The verify gate
+at each milestone is there for exactly that.
